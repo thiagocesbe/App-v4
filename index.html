@@ -134,9 +134,42 @@ save();render();}
 
 function deleteItem(ai,si,ii){data[ai].sections[si].items.splice(ii,1);save();render();}
 
-function touchStart(ai,si,ii){touchTimer=setTimeout(()=>{drag={ai,si,ii};},200);} 
-function touchMove(ai,si,ii){if(!drag)return;let arr=data[ai].sections[si].items;let moved=arr.splice(drag.ii,1)[0];arr.splice(ii,0,moved);drag={ai,si,ii};render();}
-function touchEnd(ai,si,ii){if(!drag){startEdit(ai,si,ii);}else{drag=null;save();}clearTimeout(touchTimer);} 
+// DRAG SUAVE (SEGURAR E ARRASTAR DE VERDADE)
+let dragItem = null;
+let isDragging = false;
+
+function touchStart(ai,si,ii){
+  touchTimer = setTimeout(()=>{
+    dragItem = {ai,si,ii};
+    isDragging = true;
+  },200);
+}
+
+function touchMove(ai,si,ii){
+  if(!isDragging || !dragItem) return;
+
+  let arr = data[ai].sections[si].items;
+
+  if(ii !== dragItem.ii){
+    let moved = arr.splice(dragItem.ii,1)[0];
+    arr.splice(ii,0,moved);
+    dragItem.ii = ii;
+    render();
+  }
+}
+
+function touchEnd(ai,si,ii){
+  clearTimeout(touchTimer);
+
+  if(!isDragging){
+    startEdit(ai,si,ii);
+  } else {
+    save();
+  }
+
+  dragItem = null;
+  isDragging = false;
+}else{drag=null;save();}clearTimeout(touchTimer);} 
 
 function render(){
 let el=document.getElementById('accounts');el.innerHTML='';
