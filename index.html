@@ -19,7 +19,7 @@ header{padding:14px;font-size:18px;font-weight:bold}
 .card{background:#1a1a1c;border-radius:14px;padding:14px;margin-bottom:14px}
 .section{margin-top:8px;padding:8px;background:#121214;border-radius:10px}
 .section-header{display:flex;justify-content:space-between;align-items:center}
-.add-btn{font-size:18px;cursor:pointer}
+.add-btn{cursor:pointer}
 .item{display:flex;justify-content:space-between;margin:4px 0;align-items:center;padding:6px;border-radius:8px}
 .item:active{background:#2a2a2c}
 .total{margin-top:4px;font-weight:bold}
@@ -28,7 +28,6 @@ button{background:#fff;color:#000;font-weight:bold}
 .small{font-size:11px;opacity:.7}
 .delete-text{color:#ff4d4d;font-size:11px;margin-top:4px}
 .account-header{cursor:pointer}
-.arrow{margin-left:6px;font-size:12px}
 
 input[type="color"]{width:32px;height:32px;border-radius:50%;border:none}
 </style>
@@ -46,7 +45,7 @@ input[type="color"]{width:32px;height:32px;border-radius:50%;border:none}
 <div id="accountForm" style="display:none">
 <div style="display:flex;gap:8px">
 <input id="accountName" placeholder="Nova conta" />
-<input id="accountColor" type="color" />
+<input id="accountColor" type="color" value="#ffffff" />
 </div>
 <button onclick="addAccount()">Adicionar</button>
 </div>
@@ -59,8 +58,8 @@ input[type="color"]{width:32px;height:32px;border-radius:50%;border:none}
 <script>
 let data = JSON.parse(localStorage.getItem('financeAppPRO')) || [];
 let drag = null;
+let touchTimer = null;
 
-// título persistente
 let titleSaved = localStorage.getItem('appTitle') || 'Meu Controle';
 const titleEl=document.getElementById('title');
 titleEl.innerText=titleSaved;
@@ -84,12 +83,19 @@ function defaultSections(){return[
 ];}
 
 function addAccount(){
-let name=document.getElementById('accountName').value;
-let color=document.getElementById('accountColor').value;
-if(!name)return;
+let name = document.getElementById('accountName').value.trim();
+let color = document.getElementById('accountColor').value || '#ffffff';
+
+if(!name){
+ alert('Digite um nome para a conta');
+ return;
+}
+
 data.push({name,color,sections:defaultSections(),editing:null,showForm:{}});
+
 document.getElementById('accountName').value='';
-save();render();}
+save();render();
+}
 
 function toggleForm(ai,si){data[ai].showForm[si]=!data[ai].showForm[si];data[ai].editing=null;render();}
 function startEdit(ai,si,ii){data[ai].editing={si,ii};render();}
@@ -121,17 +127,30 @@ save();render();}
 
 function deleteItem(ai,si,ii){data[ai].sections[si].items.splice(ii,1);save();render();}
 
-// DRAG TOUCH SIMPLES
-function touchStart(ai,si,ii){drag={ai,si,ii};}
-function touchEnter(ai,si,ii){
-if(!drag)return;
-let arr=data[ai].sections[si].items;
-let moved=arr.splice(drag.ii,1)[0];
-arr.splice(ii,0,moved);
-drag={ai,si,ii};
-render();
+function touchStart(ai,si,ii){
+ touchTimer = setTimeout(()=>{
+  drag = {ai,si,ii};
+ },200);
 }
-function touchEnd(){drag=null;save();}
+
+function touchMove(ai,si,ii){
+ if(!drag) return;
+ let arr=data[ai].sections[si].items;
+ let moved=arr.splice(drag.ii,1)[0];
+ arr.splice(ii,0,moved);
+ drag={ai,si,ii};
+ render();
+}
+
+function touchEnd(ai,si,ii){
+ if(!drag){
+  startEdit(ai,si,ii);
+ } else {
+  drag=null;
+  save();
+ }
+ clearTimeout(touchTimer);
+}
 
 function render(){
 let el=document.getElementById('accounts');el.innerHTML='';
@@ -166,9 +185,8 @@ ${sec.name==='Contas Recorrentes'?`<input id='due-${ai}-${si}' value='${it.due||
 }else{
 secDiv.innerHTML+=`<div class='item'
  ontouchstart='touchStart(${ai},${si},${ii})'
- ontouchmove='touchEnter(${ai},${si},${ii})'
- ontouchend='touchEnd()'
- onclick='startEdit(${ai},${si},${ii})'>
+ ontouchmove='touchMove(${ai},${si},${ii})'
+ ontouchend='touchEnd(${ai},${si},${ii})'>
 <span>${it.name}${parcelaTxt}${dueTxt}</span>
 <span>${brl(it.value)}</span>
 </div>`;
