@@ -20,7 +20,7 @@ header{padding:14px;font-size:18px;font-weight:bold}
 .section{margin-top:8px;padding:8px;background:#121214;border-radius:10px}
 .section-header{display:flex;justify-content:space-between;align-items:center}
 .add-btn{cursor:pointer}
-.item{display:flex;justify-content:space-between;margin:4px 0;align-items:center;padding:6px;border-radius:8px}
+.item{display:flex;justify-content:space-between;margin:4px 0;align-items:center;padding:8px;border-radius:8px}
 .item:active{background:#2a2a2c}
 .total{margin-top:4px;font-weight:bold}
 input,button{width:100%;margin:4px 0;padding:8px;border-radius:8px;border:none;font-size:14px}
@@ -29,7 +29,6 @@ button{background:#fff;color:#000;font-weight:bold}
 .delete-text{color:#ff4d4d;font-size:11px;margin-top:4px;cursor:pointer}
 .account-header{cursor:pointer}
 .arrow{margin-left:6px;font-size:12px;cursor:pointer}
-
 input[type="color"]{width:32px;height:32px;border-radius:50%;border:none}
 </style>
 </head>
@@ -42,7 +41,6 @@ input[type="color"]{width:32px;height:32px;border-radius:50%;border:none}
 <strong>Nova Conta</strong>
 <span id="toggleIcon">+</span>
 </div>
-
 <div id="accountForm" style="display:none">
 <div style="display:flex;gap:8px">
 <input id="accountName" placeholder="Nova conta" />
@@ -58,9 +56,10 @@ input[type="color"]{width:32px;height:32px;border-radius:50%;border:none}
 
 <script>
 let data = JSON.parse(localStorage.getItem('financeAppPRO')) || [];
-let drag = null;
+let dragItem = null;
 let touchTimer = null;
 
+// título persistente
 let titleSaved = localStorage.getItem('appTitle') || 'Meu Controle';
 const titleEl=document.getElementById('title');
 titleEl.innerText=titleSaved;
@@ -134,42 +133,29 @@ save();render();}
 
 function deleteItem(ai,si,ii){data[ai].sections[si].items.splice(ii,1);save();render();}
 
-// DRAG SUAVE (SEGURAR E ARRASTAR DE VERDADE)
-let dragItem = null;
-let isDragging = false;
-
+// DRAG SIMPLES E ESTÁVEL
 function touchStart(ai,si,ii){
   touchTimer = setTimeout(()=>{
     dragItem = {ai,si,ii};
-    isDragging = true;
   },200);
-}
-
-function touchMove(ai,si,ii){
-  if(!isDragging || !dragItem) return;
-
-  let arr = data[ai].sections[si].items;
-
-  if(ii !== dragItem.ii){
-    let moved = arr.splice(dragItem.ii,1)[0];
-    arr.splice(ii,0,moved);
-    dragItem.ii = ii;
-    render();
-  }
 }
 
 function touchEnd(ai,si,ii){
   clearTimeout(touchTimer);
 
-  if(!isDragging){
+  if(!dragItem){
     startEdit(ai,si,ii);
-  } else {
-    save();
+    return;
   }
 
+  let arr = data[ai].sections[si].items;
+  let moved = arr.splice(dragItem.ii,1)[0];
+  arr.splice(ii,0,moved);
+
   dragItem = null;
-  isDragging = false;
-}else{drag=null;save();}clearTimeout(touchTimer);} 
+  save();
+  render();
+}
 
 function render(){
 let el=document.getElementById('accounts');el.innerHTML='';
@@ -198,20 +184,19 @@ if(acc.editing && acc.editing.si===si && acc.editing.ii===ii){
 secDiv.innerHTML+=`<div>
 <input id='name-${ai}-${si}' value='${it.name}'>
 <input id='value-${ai}-${si}' inputmode='decimal' value='${it.value}'>
-${sec.name==='Contas Recorrentes'?`<input id='due-${ai}-${si}' value='${it.due||''}'>`:''}
-${sec.name==='Contas Parceladas'?`<input id='parc-${ai}-${si}' value='${it.parcelas||''}'>`:''}
+${sec.name==='Contas Recorrentes'?`<input id='due-${ai}-${si}' inputmode='numeric' value='${it.due||''}'>`:''}
+${sec.name==='Contas Parceladas'?`<input id='parc-${ai}-${si}' inputmode='numeric' value='${it.parcelas||''}'>`:''}
 <button onclick='saveItem(${ai},${si},${ii})'>Salvar</button>
 <div class='delete-text' onclick='deleteItem(${ai},${si},${ii})'>Excluir</div>
 </div>`;
 }else{
 secDiv.innerHTML+=`<div class='item'
  ontouchstart='touchStart(${ai},${si},${ii})'
- ontouchmove='touchMove(${ai},${si},${ii})'
  ontouchend='touchEnd(${ai},${si},${ii})'>
 <span onclick='startEdit(${ai},${si},${ii})'>${it.name}${parcelaTxt}${dueTxt}</span>
 <span>
-  ${brl(it.value)}
-  ${it.parcelas?`<span class='arrow' onclick='event.stopPropagation(); nextParcela(${ai},${si},${ii})'>➡️</span>`:''}
+${brl(it.value)}
+${it.parcelas?`<span class='arrow' onclick='event.stopPropagation(); nextParcela(${ai},${si},${ii})'>➡️</span>`:''}
 </span>
 </div>`;
 }
@@ -221,8 +206,8 @@ if(acc.showForm[si]){
 secDiv.innerHTML+=`<div>
 <input id='name-${ai}-${si}' placeholder='Descrição'>
 <input id='value-${ai}-${si}' inputmode='decimal' placeholder='R$'>
-${sec.name==='Contas Recorrentes'?`<input id='due-${ai}-${si}' placeholder='Vencimento' inputmode='numeric'>`:''}
-${sec.name==='Contas Parceladas'?`<input id='parc-${ai}-${si}' placeholder='Parcelas' inputmode='numeric'>`:''}
+${sec.name==='Contas Recorrentes'?`<input id='due-${ai}-${si}' inputmode='numeric' placeholder='Vencimento'>`:''}
+${sec.name==='Contas Parceladas'?`<input id='parc-${ai}-${si}' inputmode='numeric' placeholder='Parcelas'>`:''}
 <button onclick='saveItem(${ai},${si})'>Salvar</button>
 </div>`;
 }
