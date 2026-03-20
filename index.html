@@ -19,9 +19,9 @@ header{padding:11px;font-size:16px;font-weight:bold}
 .add-btn{cursor:pointer}
 .item{display:flex;justify-content:space-between;margin:3px 0;align-items:center;padding:6px;border-radius:6px}
 .item.dragging{opacity:0.4}
-.floating{position:fixed;pointer-events:none;z-index:9999;background:#1a1a1c;border-radius:8px;padding:6px;opacity:0.9}
+.floating{position:absolute;pointer-events:none;z-index:9999;background:#1a1a1c;border-radius:8px;padding:6px;opacity:0.9;width:90%}
 .total{margin-top:3px;font-weight:bold}
-input,button,textarea{width:100%;margin:3px 0;padding:6px;border-radius:6px;border:none;font-size:13px}
+input,button,textarea{min-height:80px;resize:none;background:transparent;color:#fff;border:none;outline:none}
 button{background:#fff;color:#000;font-weight:bold}
 .small{font-size:10px;opacity:.7}
 .delete-text{color:#ff4d4d;font-size:10px;margin-top:3px;cursor:pointer}
@@ -160,6 +160,15 @@ function touchStart(ai,si,ii,e){
   dragIndex = { ai, si, ii };
 
   const itemEl = e.currentTarget.cloneNode(true);
+  const parent = e.currentTarget.parentNode;
+
+  itemEl.classList.add('floating');
+  parent.appendChild(itemEl);
+
+  floatingEl = itemEl;
+};
+
+  const itemEl = e.currentTarget.cloneNode(true);
   itemEl.classList.add('floating');
   document.body.appendChild(itemEl);
   floatingEl = itemEl;
@@ -169,10 +178,29 @@ function touchMove(e, ai, si){
   if(!dragIndex) return;
 
   const touch = e.touches[0];
+  const section = e.currentTarget.parentNode;
+
   if(floatingEl){
-    floatingEl.style.top = touch.clientY + 'px';
-    floatingEl.style.left = touch.clientX + 'px';
+    const rect = section.getBoundingClientRect();
+    floatingEl.style.top = (touch.clientY - rect.top) + 'px';
+    floatingEl.style.left = '5%';
   }
+
+  const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
+  const target = elements.find(el => el.classList?.contains('item'));
+  if(!target) return;
+
+  const children = Array.from(section.querySelectorAll('.item'));
+  const newIndex = children.indexOf(target);
+  const arr = data[ai].sections[si].items;
+
+  if(newIndex >= 0 && newIndex !== dragIndex.ii){
+    const moved = arr.splice(dragIndex.ii, 1)[0];
+    arr.splice(newIndex, 0, moved);
+    dragIndex.ii = newIndex;
+    render();
+  }
+}
 
   const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
   const target = elements.find(el => el.classList?.contains('item'));
@@ -195,6 +223,9 @@ function touchEnd(){
     floatingEl.remove();
     floatingEl = null;
   }
+  dragIndex = null;
+  save();
+}
   dragIndex = null;
   save();
 }
