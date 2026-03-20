@@ -10,7 +10,6 @@
 <link rel="apple-touch-icon" href="icon.png">
 <title>Controle de Contas PRO</title>
 <style>
-/* REDUÇÃO DE ESPAÇO ~20% */
 body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin:0;background:#0f0f10;color:#fff;font-size:80%}
 header{padding:11px;font-size:16px;font-weight:bold}
 .container{padding:11px}
@@ -19,15 +18,17 @@ header{padding:11px;font-size:16px;font-weight:bold}
 .section-header{display:flex;justify-content:space-between;align-items:center}
 .add-btn{cursor:pointer}
 .item{display:flex;justify-content:space-between;margin:3px 0;align-items:center;padding:6px;border-radius:6px}
-.item:active{background:#2a2a2c}
+.item.dragging{opacity:0.4}
+.floating{position:fixed;pointer-events:none;z-index:9999;background:#1a1a1c;border-radius:8px;padding:6px;opacity:0.9}
 .total{margin-top:3px;font-weight:bold}
-input,button{width:100%;margin:3px 0;padding:6px;border-radius:6px;border:none;font-size:13px}
+input,button,textarea{width:100%;margin:3px 0;padding:6px;border-radius:6px;border:none;font-size:13px}
 button{background:#fff;color:#000;font-weight:bold}
 .small{font-size:10px;opacity:.7}
 .delete-text{color:#ff4d4d;font-size:10px;margin-top:3px;cursor:pointer}
 .account-header{cursor:pointer}
 .arrow{margin-left:5px;font-size:11px;cursor:pointer}
 input[type="color"]{width:28px;height:28px;border-radius:50%;border:none}
+textarea{min-height:80px;resize:none}
 </style>
 </head>
 <body>
@@ -50,16 +51,41 @@ input[type="color"]{width:28px;height:28px;border-radius:50%;border:none}
 
 <div id="accounts"></div>
 <div id="grandTotal" class="card"></div>
+
+<!-- ANOTAÇÕES -->
+<div class="card">
+<div class="section-header" onclick="toggleNotes()">
+<strong>Anotações</strong>
+<span id="notesToggle">▼</span>
+</div>
+<div id="notesArea" style="display:none">
+<textarea id="notesInput" placeholder="Escreva suas anotações..."></textarea>
+</div>
+</div>
+
 </div>
 
 <script>
 let data = JSON.parse(localStorage.getItem('financeAppPRO')) || [];
+let notes = localStorage.getItem('notes') || '';
 let dragIndex = null;
+let floatingEl = null;
 
 let titleSaved = localStorage.getItem('appTitle') || 'Meu Controle';
 const titleEl=document.getElementById('title');
 titleEl.innerText=titleSaved;
 titleEl.onblur=()=>localStorage.setItem('appTitle',titleEl.innerText);
+
+const notesInput=document.getElementById('notesInput');
+notesInput.value=notes;
+notesInput.oninput=()=>localStorage.setItem('notes',notesInput.value);
+
+function toggleNotes(){
+let area=document.getElementById('notesArea');
+let icon=document.getElementById('notesToggle');
+if(area.style.display==='none'){area.style.display='block';icon.innerText='▲'}
+else{area.style.display='none';icon.innerText='▼'}
+}
 
 function save(){localStorage.setItem('financeAppPRO',JSON.stringify(data));}
 function brl(v){return v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
@@ -129,18 +155,33 @@ save();render();}
 
 function deleteItem(ai,si,ii){data[ai].sections[si].items.splice(ii,1);save();render();}
 
-// DRAG FUNCIONAL
-function touchStart(ai,si,ii){ dragIndex = { ai, si, ii }; }
+// DRAG COM ITEM FLUTUANDO
+function touchStart(ai,si,ii,e){
+  dragIndex = { ai, si, ii };
+
+  const itemEl = e.currentTarget.cloneNode(true);
+  itemEl.classList.add('floating');
+  document.body.appendChild(itemEl);
+  floatingEl = itemEl;
+}
 
 function touchMove(e, ai, si){
   if(!dragIndex) return;
+
   const touch = e.touches[0];
+  if(floatingEl){
+    floatingEl.style.top = touch.clientY + 'px';
+    floatingEl.style.left = touch.clientX + 'px';
+  }
+
   const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
   const target = elements.find(el => el.classList?.contains('item'));
   if(!target) return;
+
   const children = Array.from(target.parentNode.querySelectorAll('.item'));
   const newIndex = children.indexOf(target);
   const arr = data[ai].sections[si].items;
+
   if(newIndex >= 0 && newIndex !== dragIndex.ii){
     const moved = arr.splice(dragIndex.ii, 1)[0];
     arr.splice(newIndex, 0, moved);
@@ -149,7 +190,14 @@ function touchMove(e, ai, si){
   }
 }
 
-function touchEnd(){ dragIndex=null; save(); }
+function touchEnd(){
+  if(floatingEl){
+    floatingEl.remove();
+    floatingEl = null;
+  }
+  dragIndex = null;
+  save();
+}
 
 function render(){
 let el=document.getElementById('accounts');el.innerHTML='';
@@ -172,7 +220,6 @@ sec.items.forEach((it,ii)=>{
 secTotal+=it.value;
 let parcelaTxt='';
 if(it.parcelas){let a=String(it.atual).padStart(2,'0');let t=String(it.parcelas).padStart(2,'0');parcelaTxt=` (${a}/${t})`;}
-
 let dueTxt=(it.due && sec.name==='Contas Recorrentes')?`<div class='small' style="color:#aaa">dia ${it.due}</div>`:'';
 
 if(acc.editing && acc.editing.si===si && acc.editing.ii===ii){
@@ -186,7 +233,7 @@ ${sec.name==='Contas Parceladas'?`<input id='parc-${ai}-${si}' inputmode='numeri
 </div>`;
 }else{
 secDiv.innerHTML+=`<div class='item'
- ontouchstart='touchStart(${ai},${si},${ii})'
+ ontouchstart='touchStart(${ai},${si},${ii}, event)'
  ontouchmove='touchMove(event, ${ai}, ${si})'
  ontouchend='touchEnd()'>
 <span style="color:${acc.color}" onclick='startEdit(${ai},${si},${ii})'>${it.name}${parcelaTxt}${dueTxt}</span>
