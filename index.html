@@ -18,17 +18,16 @@ header{padding:11px;font-size:16px;font-weight:bold}
 .section-header{display:flex;justify-content:space-between;align-items:center}
 .add-btn{cursor:pointer}
 .item{display:flex;justify-content:space-between;margin:3px 0;align-items:center;padding:6px;border-radius:6px}
-.item.dragging{opacity:0.4}
-.floating{position:absolute;pointer-events:none;z-index:9999;background:#1a1a1c;border-radius:8px;padding:6px;opacity:0.9;width:90%}
+.item:active{background:#2a2a2c}
 .total{margin-top:3px;font-weight:bold}
-input,button,textarea{min-height:80px;resize:none;background:transparent;color:#fff;border:none;outline:none}
+input,button,textarea{width:100%;margin:3px 0;padding:6px;border-radius:6px;border:none;font-size:13px}
 button{background:#fff;color:#000;font-weight:bold}
 .small{font-size:10px;opacity:.7}
 .delete-text{color:#ff4d4d;font-size:10px;margin-top:3px;cursor:pointer}
 .account-header{cursor:pointer}
 .arrow{margin-left:5px;font-size:11px;cursor:pointer}
 input[type="color"]{width:28px;height:28px;border-radius:50%;border:none}
-textarea{min-height:80px;resize:none}
+textarea{min-height:80px;resize:none;background:transparent;color:#fff;border:none;outline:none}
 </style>
 </head>
 <body>
@@ -52,7 +51,6 @@ textarea{min-height:80px;resize:none}
 <div id="accounts"></div>
 <div id="grandTotal" class="card"></div>
 
-<!-- ANOTAÇÕES -->
 <div class="card">
 <div class="section-header" onclick="toggleNotes()">
 <strong>Anotações</strong>
@@ -69,7 +67,7 @@ textarea{min-height:80px;resize:none}
 let data = JSON.parse(localStorage.getItem('financeAppPRO')) || [];
 let notes = localStorage.getItem('notes') || '';
 let dragIndex = null;
-let floatingEl = null;
+let isDragging = false;
 
 let titleSaved = localStorage.getItem('appTitle') || 'Meu Controle';
 const titleEl=document.getElementById('title');
@@ -155,46 +153,30 @@ save();render();}
 
 function deleteItem(ai,si,ii){data[ai].sections[si].items.splice(ii,1);save();render();}
 
-// DRAG COM ITEM FLUTUANDO
-function touchStart(ai,si,ii,e){
+// DRAG FUNCIONAL E ESTÁVEL
+function touchStart(ai, si, ii) {
   dragIndex = { ai, si, ii };
+  isDragging = false;
 
-  const itemEl = e.currentTarget.cloneNode(true);
-  const parent = e.currentTarget.parentNode;
-
-  itemEl.classList.add('floating');
-  parent.appendChild(itemEl);
-
-  floatingEl = itemEl;
-};
-
-  const itemEl = e.currentTarget.cloneNode(true);
-  itemEl.classList.add('floating');
-  document.body.appendChild(itemEl);
-  floatingEl = itemEl;
+  setTimeout(() => {
+    isDragging = true;
+  }, 150);
 }
 
-function touchMove(e, ai, si){
-  if(!dragIndex) return;
+function touchMove(e, ai, si) {
+  if (!dragIndex || !isDragging) return;
 
   const touch = e.touches[0];
-  const section = e.currentTarget.parentNode;
-
-  if(floatingEl){
-    const rect = section.getBoundingClientRect();
-    floatingEl.style.top = (touch.clientY - rect.top) + 'px';
-    floatingEl.style.left = '5%';
-  }
-
   const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
   const target = elements.find(el => el.classList?.contains('item'));
-  if(!target) return;
 
-  const children = Array.from(section.querySelectorAll('.item'));
-  const newIndex = children.indexOf(target);
+  if (!target) return;
+
+  const list = Array.from(target.parentNode.querySelectorAll('.item'));
+  const newIndex = list.indexOf(target);
   const arr = data[ai].sections[si].items;
 
-  if(newIndex >= 0 && newIndex !== dragIndex.ii){
+  if (newIndex >= 0 && newIndex !== dragIndex.ii) {
     const moved = arr.splice(dragIndex.ii, 1)[0];
     arr.splice(newIndex, 0, moved);
     dragIndex.ii = newIndex;
@@ -202,31 +184,13 @@ function touchMove(e, ai, si){
   }
 }
 
-  const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
-  const target = elements.find(el => el.classList?.contains('item'));
-  if(!target) return;
-
-  const children = Array.from(target.parentNode.querySelectorAll('.item'));
-  const newIndex = children.indexOf(target);
-  const arr = data[ai].sections[si].items;
-
-  if(newIndex >= 0 && newIndex !== dragIndex.ii){
-    const moved = arr.splice(dragIndex.ii, 1)[0];
-    arr.splice(newIndex, 0, moved);
-    dragIndex.ii = newIndex;
-    render();
+function touchEnd(ai, si, ii) {
+  if (!isDragging) {
+    startEdit(ai, si, ii);
   }
-}
 
-function touchEnd(){
-  if(floatingEl){
-    floatingEl.remove();
-    floatingEl = null;
-  }
   dragIndex = null;
-  save();
-}
-  dragIndex = null;
+  isDragging = false;
   save();
 }
 
@@ -264,9 +228,9 @@ ${sec.name==='Contas Parceladas'?`<input id='parc-${ai}-${si}' inputmode='numeri
 </div>`;
 }else{
 secDiv.innerHTML+=`<div class='item'
- ontouchstart='touchStart(${ai},${si},${ii}, event)'
+ ontouchstart='touchStart(${ai},${si},${ii})'
  ontouchmove='touchMove(event, ${ai}, ${si})'
- ontouchend='touchEnd()'>
+ ontouchend='touchEnd(${ai},${si},${ii})'>
 <span style="color:${acc.color}" onclick='startEdit(${ai},${si},${ii})'>${it.name}${parcelaTxt}${dueTxt}</span>
 <span>
 <span style="color:${acc.color}">${brl(it.value)}</span>
