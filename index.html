@@ -78,6 +78,16 @@ const notesInput=document.getElementById('notesInput');
 notesInput.value=notes;
 notesInput.oninput=()=>localStorage.setItem('notes',notesInput.value);
 
+// DUPLO TOQUE
+let lastTap = 0;
+function handleClick(ai, si, ii){
+  const now = Date.now();
+  if(now - lastTap < 300){
+    startEdit(ai, si, ii);
+  }
+  lastTap = now;
+}
+
 function toggleNotes(){
 let area=document.getElementById('notesArea');
 let icon=document.getElementById('notesToggle');
@@ -153,14 +163,20 @@ save();render();}
 
 function deleteItem(ai,si,ii){data[ai].sections[si].items.splice(ii,1);save();render();}
 
-// DRAG FUNCIONAL E ESTÁVEL
+// LIMPAR SEÇÃO
+function clearSection(ai, si){
+  if(confirm('Deseja limpar todos os itens dessa seção?')){
+    data[ai].sections[si].items = [];
+    save();
+    render();
+  }
+}
+
+// DRAG
 function touchStart(ai, si, ii) {
   dragIndex = { ai, si, ii };
   isDragging = false;
-
-  setTimeout(() => {
-    isDragging = true;
-  }, 150);
+  setTimeout(() => { isDragging = true; }, 150);
 }
 
 function touchMove(e, ai, si) {
@@ -186,9 +202,8 @@ function touchMove(e, ai, si) {
 
 function touchEnd(ai, si, ii) {
   if (!isDragging) {
-    startEdit(ai, si, ii);
+    handleClick(ai, si, ii);
   }
-
   dragIndex = null;
   isDragging = false;
   save();
@@ -209,7 +224,12 @@ card.innerHTML=header;
 acc.sections.forEach((sec,si)=>{
 let secTotal=0;
 let secDiv=document.createElement('div');secDiv.className='section';
-secDiv.innerHTML=`<div class='section-header'><strong>${sec.name}</strong><span class='add-btn' onclick='toggleForm(${ai},${si})'>+</span></div>`;
+
+secDiv.innerHTML=`<div class='section-header'>
+<strong>${sec.name}</strong>
+<span class='add-btn' onclick='toggleForm(${ai},${si})'>+</span>
+</div>
+<div class='delete-text' onclick='clearSection(${ai},${si})'>Limpar</div>`;
 
 sec.items.forEach((it,ii)=>{
 secTotal+=it.value;
@@ -231,7 +251,7 @@ secDiv.innerHTML+=`<div class='item'
  ontouchstart='touchStart(${ai},${si},${ii})'
  ontouchmove='touchMove(event, ${ai}, ${si})'
  ontouchend='touchEnd(${ai},${si},${ii})'>
-<span style="color:${acc.color}" onclick='startEdit(${ai},${si},${ii})'>${it.name}${parcelaTxt}${dueTxt}</span>
+<span style="color:${acc.color}" onclick='handleClick(${ai},${si},${ii})'>${it.name}${parcelaTxt}${dueTxt}</span>
 <span>
 <span style="color:${acc.color}">${brl(it.value)}</span>
 ${it.parcelas?`<span class='arrow' onclick='event.stopPropagation(); nextParcela(${ai},${si},${ii})'>➡️</span>`:''}
