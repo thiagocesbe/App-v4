@@ -1,175 +1,269 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Controle</title>
-
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Contas PRO">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.png">
+<title>Controle de Contas PRO</title>
 <style>
-body{margin:0;background:#0f0f10;color:#fff;font-family:-apple-system;font-size:80%}
-header{padding:10px;font-size:16px;font-weight:bold}
-.container{padding:10px}
-.card{background:#1a1a1c;border-radius:10px;padding:10px;margin-bottom:10px}
+body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;margin:0;background:#0f0f10;color:#fff;font-size:80%}
+header{padding:11px;font-size:16px;font-weight:bold}
+.container{padding:11px}
+.card{background:#1a1a1c;border-radius:12px;padding:11px;margin-bottom:11px}
 .section{margin-top:6px;padding:6px;background:#121214;border-radius:8px}
-.section-header{display:flex;justify-content:space-between}
-.item{display:flex;justify-content:space-between;padding:6px;border-radius:6px}
-.item.dragging{opacity:.3}
-.floating{
-position:fixed;
-z-index:9999;
-pointer-events:none;
-background:#1a1a1c;
-padding:6px;
-border-radius:6px;
-transform:scale(1.05);
-}
-.small{font-size:10px;color:#aaa}
-.total{margin-top:5px;font-weight:bold}
-textarea{background:transparent;color:#fff;border:none;width:100%;outline:none}
+.section-header{display:flex;justify-content:space-between;align-items:center}
+.add-btn{cursor:pointer}
+.item{display:flex;justify-content:space-between;margin:3px 0;align-items:center;padding:6px;border-radius:6px}
+.item:active{background:#2a2a2c}
+.total{margin-top:3px;font-weight:bold}
+input,button,textarea{width:100%;margin:3px 0;padding:6px;border-radius:6px;border:none;font-size:13px}
+button{background:#fff;color:#000;font-weight:bold}
+.small{font-size:10px;opacity:.7}
+.delete-text{color:#ff4d4d;font-size:10px;margin-top:3px;cursor:pointer}
+.account-header{cursor:pointer}
+.arrow{margin-left:5px;font-size:11px;cursor:pointer}
+input[type="color"]{width:28px;height:28px;border-radius:50%;border:none}
+textarea{min-height:80px;resize:none;background:transparent;color:#fff;border:none;outline:none}
 </style>
 </head>
-
 <body>
-
-<header contenteditable id="title"></header>
-
+<header contenteditable="true" id="title"></header>
 <div class="container">
+
+<div class="card">
+<div class="section-header" onclick="toggleAccountForm()">
+<strong>Nova Conta</strong>
+<span id="toggleIcon">+</span>
+</div>
+<div id="accountForm" style="display:none">
+<div style="display:flex;gap:6px">
+<input id="accountName" placeholder="Nova conta" />
+<input id="accountColor" type="color" value="#ffffff" />
+</div>
+<button onclick="addAccount()">Adicionar</button>
+</div>
+</div>
+
 <div id="accounts"></div>
 <div id="grandTotal" class="card"></div>
 
 <div class="card">
-<div onclick="toggleNotes()">Anotações ▼</div>
+<div class="section-header" onclick="toggleNotes()">
+<strong>Anotações</strong>
+<span id="notesToggle">▼</span>
+</div>
 <div id="notesArea" style="display:none">
-<textarea id="notesInput"></textarea>
+<textarea id="notesInput" placeholder="Escreva suas anotações..."></textarea>
 </div>
 </div>
+
 </div>
 
 <script>
+let data = JSON.parse(localStorage.getItem('financeAppPRO')) || [];
+let notes = localStorage.getItem('notes') || '';
+let dragIndex = null;
+let isDragging = false;
 
-let data = JSON.parse(localStorage.getItem("app")) || [];
-let drag = null;
-let floating = null;
+let titleSaved = localStorage.getItem('appTitle') || 'Meu Controle';
+const titleEl=document.getElementById('title');
+titleEl.innerText=titleSaved;
+titleEl.onblur=()=>localStorage.setItem('appTitle',titleEl.innerText);
 
-// TITLE
-const titleEl = document.getElementById("title");
-titleEl.innerText = localStorage.getItem("title") || "Meu Controle";
-titleEl.oninput = () => localStorage.setItem("title", titleEl.innerText);
-
-// NOTES
-const notesInput = document.getElementById("notesInput");
-notesInput.value = localStorage.getItem("notes") || "";
-notesInput.oninput = () => localStorage.setItem("notes", notesInput.value);
+const notesInput=document.getElementById('notesInput');
+notesInput.value=notes;
+notesInput.oninput=()=>localStorage.setItem('notes',notesInput.value);
 
 function toggleNotes(){
-let el=document.getElementById("notesArea");
-el.style.display = el.style.display==="none"?"block":"none";
+let area=document.getElementById('notesArea');
+let icon=document.getElementById('notesToggle');
+if(area.style.display==='none'){area.style.display='block';icon.innerText='▲'}
+else{area.style.display='none';icon.innerText='▼'}
 }
 
-// FORMAT
-function brl(v){return v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}
+function save(){localStorage.setItem('financeAppPRO',JSON.stringify(data));}
+function brl(v){return v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
+function parseValue(v){return parseFloat(v.replace(',','.'))||0;}
 
-// RENDER
+function toggleAccountForm(){
+let f=document.getElementById('accountForm');
+let icon=document.getElementById('toggleIcon');
+if(f.style.display==='none'){f.style.display='block';icon.innerText='−'}
+else{f.style.display='none';icon.innerText='+'}
+}
+
+function defaultSections(){return[
+{name:'Contas Recorrentes',items:[]},
+{name:'Contas Parceladas',items:[]},
+{name:'Gastos Diversos',items:[]}
+];}
+
+function addAccount(){
+let name = document.getElementById('accountName').value.trim();
+let color = document.getElementById('accountColor').value || '#ffffff';
+if(!name){ alert('Digite um nome'); return; }
+
+data.push({name,color,sections:defaultSections(),editing:null,showForm:{},editingAccount:false});
+
+document.getElementById('accountName').value='';
+save();render();
+}
+
+function toggleAccountEdit(ai){data[ai].editingAccount=!data[ai].editingAccount;render();}
+function deleteAccount(ai){data.splice(ai,1);save();render();}
+
+function toggleForm(ai,si){data[ai].showForm[si]=!data[ai].showForm[si];data[ai].editing=null;render();}
+function startEdit(ai,si,ii){data[ai].editing={si,ii};render();}
+
+function nextParcela(ai,si,ii){
+let item=data[ai].sections[si].items[ii];
+if(item.parcelas && item.atual < item.parcelas){item.atual++;}
+save();render();
+}
+
+function saveItem(ai,si,ii=null){
+let name=document.getElementById(`name-${ai}-${si}`).value;
+let value=parseValue(document.getElementById(`value-${ai}-${si}`).value);
+let due=null;let parcelas=null;
+
+if(data[ai].sections[si].name==='Contas Recorrentes'){
+due=document.getElementById(`due-${ai}-${si}`).value;
+}
+if(data[ai].sections[si].name==='Contas Parceladas'){
+parcelas=parseInt(document.getElementById(`parc-${ai}-${si}`)?.value) || (ii!==null ? data[ai].sections[si].items[ii].parcelas : 1);
+}
+
+if(!name||!value)return;
+
+if(ii!==null){
+let it=data[ai].sections[si].items[ii];
+it.name=name;it.value=value;it.due=due;
+if(parcelas) it.parcelas=parcelas;
+}else{
+data[ai].sections[si].items.push({name,value,due,parcelas,atual:1});
+}
+
+data[ai].showForm[si]=false;
+data[ai].editing=null;
+save();render();}
+
+function deleteItem(ai,si,ii){data[ai].sections[si].items.splice(ii,1);save();render();}
+
+// DRAG FUNCIONAL E ESTÁVEL
+function touchStart(ai, si, ii) {
+  dragIndex = { ai, si, ii };
+  isDragging = false;
+
+  setTimeout(() => {
+    isDragging = true;
+  }, 150);
+}
+
+function touchMove(e, ai, si) {
+  if (!dragIndex || !isDragging) return;
+
+  const touch = e.touches[0];
+  const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
+  const target = elements.find(el => el.classList?.contains('item'));
+
+  if (!target) return;
+
+  const list = Array.from(target.parentNode.querySelectorAll('.item'));
+  const newIndex = list.indexOf(target);
+  const arr = data[ai].sections[si].items;
+
+  if (newIndex >= 0 && newIndex !== dragIndex.ii) {
+    const moved = arr.splice(dragIndex.ii, 1)[0];
+    arr.splice(newIndex, 0, moved);
+    dragIndex.ii = newIndex;
+    render();
+  }
+}
+
+function touchEnd(ai, si, ii) {
+  if (!isDragging) {
+    startEdit(ai, si, ii);
+  }
+
+  dragIndex = null;
+  isDragging = false;
+  save();
+}
+
 function render(){
-const el = document.getElementById("accounts");
-el.innerHTML="";
-let total=0;
+let el=document.getElementById('accounts');el.innerHTML='';
+let grand=0;
 
 data.forEach((acc,ai)=>{
-let card=document.createElement("div");
-card.className="card";
+let accTotal=0;
+let card=document.createElement('div');card.className='card';
 
-card.innerHTML=`<div style="color:${acc.color}">${acc.name}</div>`;
+let header=`<div class='account-header' style="color:${acc.color}" onclick="toggleAccountEdit(${ai})">${acc.name}</div>`;
+if(acc.editingAccount){header+=`<div class='delete-text' onclick='deleteAccount(${ai})'>Excluir conta</div>`;}
+card.innerHTML=header;
 
-acc.items.forEach((it,ii)=>{
-total+=it.value;
+acc.sections.forEach((sec,si)=>{
+let secTotal=0;
+let secDiv=document.createElement('div');secDiv.className='section';
+secDiv.innerHTML=`<div class='section-header'><strong>${sec.name}</strong><span class='add-btn' onclick='toggleForm(${ai},${si})'>+</span></div>`;
 
-let item=document.createElement("div");
-item.className="item";
-item.innerHTML=`
-<span style="color:${acc.color}">
-${it.name}
-<div class="small">dia ${it.due||""}</div>
-</span>
+sec.items.forEach((it,ii)=>{
+secTotal+=it.value;
+let parcelaTxt='';
+if(it.parcelas){let a=String(it.atual).padStart(2,'0');let t=String(it.parcelas).padStart(2,'0');parcelaTxt=` (${a}/${t})`;}
+let dueTxt=(it.due && sec.name==='Contas Recorrentes')?`<div class='small' style="color:#aaa">dia ${it.due}</div>`:'';
+
+if(acc.editing && acc.editing.si===si && acc.editing.ii===ii){
+secDiv.innerHTML+=`<div>
+<input id='name-${ai}-${si}' value='${it.name}'>
+<input id='value-${ai}-${si}' inputmode='decimal' value='${it.value}'>
+${sec.name==='Contas Recorrentes'?`<input id='due-${ai}-${si}' inputmode='numeric' value='${it.due||''}'>`:''}
+${sec.name==='Contas Parceladas'?`<input id='parc-${ai}-${si}' inputmode='numeric' value='${it.parcelas||''}'>`:''}
+<button onclick='saveItem(${ai},${si},${ii})'>Salvar</button>
+<div class='delete-text' onclick='deleteItem(${ai},${si},${ii})'>Excluir</div>
+</div>`;
+}else{
+secDiv.innerHTML+=`<div class='item'
+ ontouchstart='touchStart(${ai},${si},${ii})'
+ ontouchmove='touchMove(event, ${ai}, ${si})'
+ ontouchend='touchEnd(${ai},${si},${ii})'>
+<span style="color:${acc.color}" onclick='startEdit(${ai},${si},${ii})'>${it.name}${parcelaTxt}${dueTxt}</span>
+<span>
 <span style="color:${acc.color}">${brl(it.value)}</span>
-`;
-
-item.ontouchstart = e => startDrag(e,ai,ii,item);
-item.ontouchmove = e => moveDrag(e,ai,ii);
-item.ontouchend = endDrag;
-
-card.appendChild(item);
+${it.parcelas?`<span class='arrow' onclick='event.stopPropagation(); nextParcela(${ai},${si},${ii})'>➡️</span>`:''}
+</span>
+</div>`;
+}
 });
 
+if(acc.showForm[si]){
+secDiv.innerHTML+=`<div>
+<input id='name-${ai}-${si}' placeholder='Descrição'>
+<input id='value-${ai}-${si}' inputmode='decimal' placeholder='R$'>
+${sec.name==='Contas Recorrentes'?`<input id='due-${ai}-${si}' inputmode='numeric' placeholder='Vencimento'>`:''}
+${sec.name==='Contas Parceladas'?`<input id='parc-${ai}-${si}' inputmode='numeric' placeholder='Parcelas'>`:''}
+<button onclick='saveItem(${ai},${si})'>Salvar</button>
+</div>`;
+}
+
+secDiv.innerHTML+=`<div class='total'>Total: ${brl(secTotal)}</div>`;
+card.appendChild(secDiv);
+accTotal+=secTotal;
+});
+
+card.innerHTML+=`<div class='total'>Total Conta: ${brl(accTotal)}</div>`;
 el.appendChild(card);
+grand+=accTotal;
 });
 
-document.getElementById("grandTotal").innerText="Total: "+brl(total);
-}
-
-// DRAG REAL
-function startDrag(e,ai,ii,el){
-drag={ai,ii,startY:e.touches[0].clientY,el};
-
-floating=el.cloneNode(true);
-floating.classList.add("floating");
-document.body.appendChild(floating);
-}
-
-function moveDrag(e,ai){
-if(!drag) return;
-
-const y=e.touches[0].clientY;
-floating.style.top=y+"px";
-floating.style.left="10px";
-
-const elements=document.elementsFromPoint(e.touches[0].clientX,y);
-const target=elements.find(el=>el.classList?.contains("item"));
-
-if(!target) return;
-
-const parent=target.parentNode;
-const items=[...parent.querySelectorAll(".item")];
-const newIndex=items.indexOf(target);
-
-if(newIndex!==drag.ii){
-const arr=data[ai].items;
-const moved=arr.splice(drag.ii,1)[0];
-arr.splice(newIndex,0,moved);
-drag.ii=newIndex;
-render();
-}
-}
-
-function endDrag(){
-if(floating) floating.remove();
-drag=null;
-save();
-}
-
-// SAVE
-function save(){
-localStorage.setItem("app",JSON.stringify(data));
-}
-
-// INIT TEST DATA (caso vazio)
-if(data.length===0){
-data=[
-{
-name:"Conta Exemplo",
-color:"#00ff99",
-items:[
-{name:"Internet",value:100,due:10},
-{name:"Luz",value:80,due:15}
-]
-}
-];
-save();
+document.getElementById('grandTotal').innerHTML=`Total Geral: ${brl(grand)}`;
 }
 
 render();
-
 </script>
-
 </body>
 </html>
